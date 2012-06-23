@@ -37,6 +37,7 @@ clean:
 	rm -f ${OBJECTS}
 	rm -f ${TESTS}
 	rm -f valgrind.log
+	rm -f src/test/tests.log
 
 tests: ${TESTS}
 	@echo

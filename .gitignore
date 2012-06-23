@@ -1,4 +1,5 @@
 bin
 valgrind.log
 **.o
-src/test/test.log
+src/test/tests.log
+src/test/*_tests

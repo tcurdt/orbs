@@ -5,8 +5,8 @@
 
 typedef struct message {
   u_int8_t  type;
-  void*     message;
-  size_t    message_length;
+  void*     body;
+  size_t    body_length;
   u_int32_t crc32;
 } message, *message_t;
 
@@ -32,5 +32,6 @@ int ringbuffer_open(const char* base_path, ringbuffer_t buffer);
 int ringbuffer_append(ringbuffer_t buffer, message_t message);
 int ringbuffer_read(ringbuffer_t buffer, position_t position, message_t message);
 int ringbuffer_close(ringbuffer_t buffer);
+u_int32_t ringbuffer_size(ringbuffer_t buffer);
 
 #endif

@@ -7,7 +7,7 @@
 
 #define mu_suite_start() char *message = NULL
 #define mu_assert(test, message) if (!(test)) { return message; }
-#define mu_run_test(test) message = test(); printf(" - %s %s\n", (message)?"ERROR":"OK", #test); tests_run++; if (message) return message;
+#define mu_run_test(test) message = test(); printf(" - %s %s %s\n", (message)?"ERROR":"OK", #test, (message)?message:""); tests_run++; if (message) return message;
 
 #define RUN_TESTS(name) int main(int argc, char *argv[]) {\
   argc = argc; argv = argv; \
@@ -18,7 +18,6 @@
   exit(result != NULL);\
   return result != NULL ? 1 : 0;\
 }
-
 
 int tests_run;
 

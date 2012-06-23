@@ -4,8 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #import "ringbuffer.h"
+#include "crc.h"
+
+#define MAX(a,b) ((a)>(b))?(a):(b)
 
 // #import "bstring.h"
 // #include <stdbool.h>
@@ -30,6 +34,60 @@ static char* join(const char* a, const char* b, const char* c) {
   return ret;
 }
 
+u_int32_t ringbuffer_segment_count(ringbuffer_t buffer) {
+  u_int32_t count = 0;
+  ringebuffer_segment_t head = buffer->current_segment;
+  ringebuffer_segment_t curr = head;
+  while(curr != NULL) {
+    count += 1;
+    curr = curr->previous_segment;
+  }
+  return count;
+}
+
+static void ringbuffer_segment_push(ringbuffer_t buffer, ringebuffer_segment_t segment) {
+  ringebuffer_segment_t head = buffer->current_segment;
+  ringebuffer_segment_t prev = NULL;
+  ringebuffer_segment_t curr = head;
+  while(curr != NULL && segment->timestamp < curr->timestamp) {
+    prev = curr;
+    curr = curr->previous_segment;
+  }
+  if (prev) {
+    segment->previous_segment = prev->previous_segment;
+    prev->previous_segment = segment;
+  } else {
+    segment->previous_segment = head;
+    buffer->current_segment = segment;
+  }
+}
+
+static ringebuffer_segment_t ringbuffer_segment_pop(ringbuffer_t buffer) {
+  ringebuffer_segment_t head = buffer->current_segment;
+  ringebuffer_segment_t prev = NULL;
+  ringebuffer_segment_t curr = head;
+  while(curr != NULL && curr->previous_segment != NULL) {
+    prev = curr;
+    curr = curr->previous_segment;
+  }
+  if (prev) {
+    prev->previous_segment = NULL;
+  } else {
+    buffer->current_segment = NULL;
+  }
+  return curr;
+}
+
+u_int32_t ringbuffer_size(ringbuffer_t buffer) {
+  u_int32_t size = 0;
+  ringebuffer_segment_t curr = buffer->current_segment;
+  while(curr != NULL) {
+    size += curr->size;
+    curr = curr->previous_segment;
+  }
+  return size;
+}
+
 int ringbuffer_open(const char *base_path, ringbuffer_t buffer) {
 
   buffer->current_segment = NULL;
@@ -38,63 +96,63 @@ int ringbuffer_open(const char *base_path, ringbuffer_t buffer) {
   struct dirent *entry;
   struct stat st;
   DIR* dir = opendir(base_path);
-  char* full_path;
-  while ((entry = readdir(dir)) != NULL) {
-    timestamp = atol(entry->d_name);
-    if (timestamp > 0) {
-      full_path = join(base_path, "/", entry->d_name);
-      if (full_path) {
-        if (stat(full_path, &st) == 0) {
-          if (S_ISREG(st.st_mode)) {
-
-            segment_file_t head = buffer->current_segment;
-
-            segment_file_t file = malloc(sizeof(segment_file));
-            file->timestamp = timestamp;
-            file->size = (long)st.st_size;
-
-            segment_file_t prev = NULL;
-            segment_file_t curr = head;
-            while(curr != NULL && timestamp < curr->timestamp) {
-              prev = curr;
-              curr = curr->previous_segment;
-            }
-
-            if (prev) {
-              file->previous_segment = prev->previous_segment;
-              prev->previous_segment = file;
-            } else {
-              buffer->current_segment = file;
-              file->previous_segment = head;
+  if (dir != NULL) {
+    char* full_path;
+    while ((entry = readdir(dir)) != NULL) {
+      timestamp = atol(entry->d_name);
+      if (timestamp > 0) {
+        full_path = join(base_path, "/", entry->d_name);
+        if (full_path) {
+          if (stat(full_path, &st) == 0) {
+            if (S_ISREG(st.st_mode)) {
+              ringebuffer_segment_t segment = malloc(sizeof(ringebuffer_segment));
+              segment->timestamp = timestamp;
+              segment->size = (long)st.st_size;
+              ringbuffer_segment_push(buffer, segment);
             }
           }
+          free(full_path);
         }
-        free(full_path);
       }
     }
+    closedir(dir);
+    return 0;
   }
-  closedir(dir);
 
-  return 0;
-}
-
-u_int32_t ringbuffer_size(ringbuffer_t buffer) {
-  u_int32_t size = 0;
-  segment_file_t curr = buffer->current_segment;
-  while(curr != NULL) {
-    size += curr->size;
-    curr = curr->previous_segment;
-  }
-  return size;
+  return -1;
 }
 
 int ringbuffer_append(ringbuffer_t buffer, message_t message) {
-  // struct tm tm;
-  // time_t epoch;
+  message->crc32 = crc32_buffer((const char *)message->body, message->body_size);
+
+  ringebuffer_segment_t curr = buffer->current_segment;
+
+  if (curr == NULL || (curr->size + message->body_size) > buffer->max_segment_size) {
+    // segment too large, new one
+    time_t timestamp = time(NULL);
+    ringebuffer_segment_t segment = malloc(sizeof(ringebuffer_segment));
+    segment->timestamp = MAX(timestamp, (curr)?curr->timestamp:0);
+    segment->size = 0;
+    ringbuffer_segment_push(buffer, segment);
+  }
+  
+  if (ringbuffer_segment_count(buffer) > buffer->max_segment_count) {
+    // drop the oldest segment
+    ringebuffer_segment_t oldest = ringbuffer_segment_pop(buffer);
+    if (oldest != NULL){
+       free(oldest);
+    }
+  }
+  
+  // write
+  buffer->current_segment->size += message->body_size;
+
   return 0;
 }
 
 int ringbuffer_close(ringbuffer_t buffer) {
-  if (buffer->current_segment) free(buffer->current_segment);
+  if (buffer->current_segment) {
+    free(buffer->current_segment);
+  }
   return 0;
 }

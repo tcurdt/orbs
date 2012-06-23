@@ -1,0 +1,4 @@
+bin
+valgrind.log
+**.o
+src/test/test.log

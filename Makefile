@@ -14,7 +14,7 @@ LIB_OBJ=$(filter-out src/main/${BINARY}.o,${OBJECTS})
 TEST_SOURCES=$(wildcard src/test/*.c)
 TESTS=$(patsubst %.c,%,${TEST_SOURCES})
 
-CFLAGS=-g -O2 -Wall -Wextra -Isrc -pthread -rdynamic -DNDEBUG $(OPTFLAGS) -D_FILE_OFFSET_BITS=64
+CFLAGS=-g -O2 -Wall -Wextra -Isrc/main -pthread -rdynamic -DNDEBUG $(OPTFLAGS) -D_FILE_OFFSET_BITS=64
 
 
 all: bin/${BINARY} tests
@@ -26,7 +26,7 @@ bin/${BINARY}: ${LIB_OBJ} src/main/${BINARY}.o
 
 ${TESTS}:
 	@$(CC) $(CFLAGS) -o $@.o -c $@.c
-	@$(CC) $(CFLAGS) -o $@ $@.o
+	@$(CC) $(CFLAGS) -o $@ $@.o $(LIB_OBJ)
 
 %.o: %.c
 	@echo building $@

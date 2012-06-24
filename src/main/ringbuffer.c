@@ -1,21 +1,12 @@
-#include <sys/types.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <time.h>
-
-#import "ringbuffer.h"
+#include "common.h"
+#include "ringbuffer.h"
+#include "segments.h"
 #include "crc.h"
 
-#define MAX(a,b) ((a)>(b))?(a):(b)
+#include <sys/stat.h>
+#include <dirent.h>
+#include <time.h>
 
-// #import "bstring.h"
-// #include <stdbool.h>
-// static bool filename_matches(const char *filename) {
-//   return true;
-// }
 
 // potential overflow bug but we don't care
 // strings are coming from the filesystem
@@ -24,9 +15,7 @@ static char* join(const char* a, const char* b, const char* c) {
   size_t len = al + bl + cl + 1;
 
   char *ret = malloc(len);
-  if(ret == NULL) {
-    return NULL;
-  }
+  if(!ret) return NULL;
 
   strcpy(ret, a);
   strcpy(ret + al, b);
@@ -34,125 +23,93 @@ static char* join(const char* a, const char* b, const char* c) {
   return ret;
 }
 
-u_int32_t ringbuffer_segment_count(ringbuffer_t buffer) {
-  u_int32_t count = 0;
-  ringebuffer_segment_t head = buffer->current_segment;
-  ringebuffer_segment_t curr = head;
-  while(curr != NULL) {
-    count += 1;
-    curr = curr->previous_segment;
-  }
-  return count;
+static u_int32_t message_size(message* message) {
+  return sizeof(message) - sizeof(message->body) + message->body_size;
 }
 
-static void ringbuffer_segment_push(ringbuffer_t buffer, ringebuffer_segment_t segment) {
-  ringebuffer_segment_t head = buffer->current_segment;
-  ringebuffer_segment_t prev = NULL;
-  ringebuffer_segment_t curr = head;
-  while(curr != NULL && segment->timestamp < curr->timestamp) {
-    prev = curr;
-    curr = curr->previous_segment;
+
+int ringbuffer_open(const char *base_path, ringbuffer* buffer) {
+
+  segments* segments = &buffer->segments;
+  if (segments_init(segments) != OK) {
+    reterr("failed to init segments");
   }
-  if (prev) {
-    segment->previous_segment = prev->previous_segment;
-    prev->previous_segment = segment;
+
+  DIR* dir = opendir(base_path);
+  if (!dir) reterr("failed to open dir %s", base_path);
+
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != NULL) {
+    u_int32_t timestamp = atol(entry->d_name);
+    if (timestamp > 0) {
+      // found a segment file
+      char* full_path = join(base_path, "/", entry->d_name);
+      if (!full_path) reterr("failed to join paths");
+      struct stat st;
+      if (stat(full_path, &st) != OK) {
+        reterr("failed to get file information %s", full_path);
+      }
+      if (S_ISREG(st.st_mode)) {
+        if (segments_add(segments, timestamp, (long)st.st_size) != OK) {
+          reterr("failed to add segment");
+        }
+      }
+      free(full_path);
+    }
+  }
+  closedir(dir);
+
+  if (segments_count(segments) == 0) {
+    if (segments_add(segments, time(NULL), 0) != OK) {
+      reterr("failed to add segment");
+    }
+  }
+
+  return OK;
+}
+
+int ringbuffer_close(ringbuffer* buffer) {
+  if (segments_destroy(&buffer->segments) != OK) {
+    reterr("failed to destroy segments");
+  }
+  return OK;
+}
+
+int ringbuffer_append(ringbuffer* buffer, message* message) {
+
+  message->crc32 = crc32_buffer((const char *)message->body, message->body_size);
+
+  segments* segments = &buffer->segments;
+  if ((segments_head_size(segments) + message_size(message)) < buffer->max_segment_size) {
+    if (segments_head_write(segments, message) != OK) {
+      reterr("failed to write to segment");
+    }
   } else {
-    segment->previous_segment = head;
-    buffer->current_segment = segment;
+    // current segment full
+    if ((segments_count(segments) + 1) > buffer->max_segment_count) {
+      // remove old segment first
+      if (segments_pop(segments) != OK) {
+        reterr("failed to remove segment");
+      }
+    }
+    if (segments_add(segments, time(NULL), 0) != OK) {
+      reterr("failed to add segment");
+    }
   }
+  return OK;
 }
 
-static ringebuffer_segment_t ringbuffer_segment_pop(ringbuffer_t buffer) {
-  ringebuffer_segment_t head = buffer->current_segment;
-  ringebuffer_segment_t prev = NULL;
-  ringebuffer_segment_t curr = head;
-  while(curr != NULL && curr->previous_segment != NULL) {
-    prev = curr;
-    curr = curr->previous_segment;
-  }
-  if (prev) {
-    prev->previous_segment = NULL;
-  } else {
-    buffer->current_segment = NULL;
-  }
-  return curr;
+int ringbuffer_read(ringbuffer* buffer, position* position, message* message) {
+  return OK;
 }
 
-u_int32_t ringbuffer_size(ringbuffer_t buffer) {
+
+u_int32_t ringbuffer_size(ringbuffer* buffer) {
   u_int32_t size = 0;
-  ringebuffer_segment_t curr = buffer->current_segment;
+  segment* curr = (&buffer->segments)->head;
   while(curr != NULL) {
     size += curr->size;
     curr = curr->previous_segment;
   }
   return size;
-}
-
-int ringbuffer_open(const char *base_path, ringbuffer_t buffer) {
-
-  buffer->current_segment = NULL;
-
-  u_int32_t timestamp;
-  struct dirent *entry;
-  struct stat st;
-  DIR* dir = opendir(base_path);
-  if (dir != NULL) {
-    char* full_path;
-    while ((entry = readdir(dir)) != NULL) {
-      timestamp = atol(entry->d_name);
-      if (timestamp > 0) {
-        full_path = join(base_path, "/", entry->d_name);
-        if (full_path) {
-          if (stat(full_path, &st) == 0) {
-            if (S_ISREG(st.st_mode)) {
-              ringebuffer_segment_t segment = malloc(sizeof(ringebuffer_segment));
-              segment->timestamp = timestamp;
-              segment->size = (long)st.st_size;
-              ringbuffer_segment_push(buffer, segment);
-            }
-          }
-          free(full_path);
-        }
-      }
-    }
-    closedir(dir);
-    return 0;
-  }
-
-  return -1;
-}
-
-int ringbuffer_append(ringbuffer_t buffer, message_t message) {
-  message->crc32 = crc32_buffer((const char *)message->body, message->body_size);
-
-  ringebuffer_segment_t curr = buffer->current_segment;
-
-  if (curr == NULL || (curr->size + message->body_size) > buffer->max_segment_size) {
-    // segment too large, new one
-    time_t timestamp = time(NULL);
-    ringebuffer_segment_t segment = malloc(sizeof(ringebuffer_segment));
-    segment->timestamp = MAX(timestamp, (curr)?curr->timestamp:0);
-    segment->size = 0;
-    ringbuffer_segment_push(buffer, segment);
-  }
-  
-  if (ringbuffer_segment_count(buffer) > buffer->max_segment_count) {
-    // drop the oldest segment
-    ringebuffer_segment_t oldest = ringbuffer_segment_pop(buffer);
-    if (oldest != NULL){
-       free(oldest);
-    }
-  }
-  
-  // write
-  buffer->current_segment->size += message->body_size;
-
-  return 0;
-}
-
-int ringbuffer_close(ringbuffer_t buffer) {
-  if (buffer->current_segment) {
-    free(buffer->current_segment);
-  }
-  return 0;
 }

@@ -5,11 +5,12 @@
 
 #include "ringbuffer.h"
 
-static u_int32_t sum_timestamps(ringbuffer_t buffer) {
+static u_int32_t sum_timestamps(ringbuffer* buffer) {
   u_int32_t sum = 0;
   int l = 0;
   int order = 0;
-  ringebuffer_segment_t curr = buffer->current_segment;
+  segments* segments = &buffer->segments;
+  segment* curr = segments->head;
   while(curr != NULL) {
     sum += curr->timestamp << order;
     curr = curr->previous_segment;
@@ -27,7 +28,7 @@ char *test_ringbuffer_open() {
 
   ringbuffer_open("src/fixtures/segments/empty", &b);
   mu_assert(ringbuffer_size(&b) == 0, "segments size should be zero");
-  mu_assert(sum_timestamps(&b) == 0, "there should be no segments");
+  mu_assert(sum_timestamps(&b) > 0, "there always is a segments");
   ringbuffer_close(&b);
 
   ringbuffer_open("src/fixtures/segments/single", &b);
@@ -55,13 +56,13 @@ char *test_ringbuffer_append() {
   m.body_size = strlen(m.body);
   m.crc32 = 0;
 
-  ringbuffer_open("src/fixtures/ringebuffer_segments/empty", &b);
+  ringbuffer_open("src/fixtures/segments/empty", &b);
   mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
   mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
   mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
-  mu_assert(ringbuffer_segment_count(&b) == 3, "each append should have started a new segment file (body > max_segment_size)");
+  mu_assert(segments_count(&b.segments) == 3, "each append should have started a new segment file (body > max_segment_size)");
   mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
-  mu_assert(ringbuffer_segment_count(&b) == 3, "max_segment_count should never be exceeded");
+  mu_assert(segments_count(&b.segments) == 3, "max_segment_count should never be exceeded");
   ringbuffer_close(&b);
 
   return NULL;

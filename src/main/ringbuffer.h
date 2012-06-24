@@ -6,9 +6,9 @@
 #include "segments.h"
 
 typedef struct ringbuffer_s {
-  u_int32_t  max_segment_count;
-  u_int32_t  max_segment_size;
-  segments   segments;
+  u_int32_t   max_segment_count;
+  u_int32_t   max_segment_size;
+  segments    segments;
 } ringbuffer;
 
 int ringbuffer_open(const char* base_path, ringbuffer* buffer);

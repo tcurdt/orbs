@@ -19,6 +19,8 @@ CFLAGS=-g -O2 -Wall -Wextra -Isrc/main -pthread -rdynamic -DNDEBUG $(OPTFLAGS) -
 
 all: bin/${BINARY} tests
 
+build: bin/${BINARY}
+
 bin/${BINARY}: ${LIB_OBJ} src/main/${BINARY}.o
 	@mkdir -p bin
 	@echo linking $@

@@ -11,6 +11,7 @@ struct position {
 typedef struct position position;
 
 struct segment {
+  const char*     full_path;
   u_int32_t       timestamp;
   u_int32_t       size;
   struct segment* previous_segment;
@@ -18,8 +19,9 @@ struct segment {
 typedef struct segment segment;
 
 struct segments {
-  segment* head;
-  FILE*    file;
+  const char* base_path;
+  segment*    head;
+  FILE*       file;
 };
 typedef struct segments segments;
 
@@ -29,6 +31,7 @@ int segments_head_write(segments* segments, message* message);
 u_int32_t segments_head_size(segments* segments);
 u_int32_t segments_count(segments* segments);
 int segments_pop(segments* segments);
-int segments_add(segments* segments, u_int32_t timestamp, u_int32_t size);
+int segments_add(segments* segments, const char *original_full_path);
+
 
 #endif

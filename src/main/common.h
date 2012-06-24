@@ -10,6 +10,6 @@
 #define OK 0
 #define ERROR -1
 
-#define reterr(F, ...) { fprintf(stderr, "[%s:%d]: " F, __FILE__, __LINE__, ##__VA_ARGS__); return ERROR; }
+#define reterr(F, ...) { fprintf(stderr, "[%s:%d]: " F "\n", __FILE__, __LINE__, ##__VA_ARGS__); return ERROR; }
 
 #endif

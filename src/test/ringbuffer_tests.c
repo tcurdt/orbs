@@ -56,12 +56,12 @@ char *test_ringbuffer_append() {
   m.body_size = strlen(m.body);
   m.crc32 = 0;
 
-  ringbuffer_open("src/fixtures/segments/empty", &b);
-  mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
-  mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
-  mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
+  ringbuffer_open("/tmp/tests", &b);
+  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
+  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
+  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
   mu_assert(segments_count(&b.segments) == 3, "each append should have started a new segment file (body > max_segment_size)");
-  mu_assert(ringbuffer_append(&b, &m) == 0, "failed to append");
+  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
   mu_assert(segments_count(&b.segments) == 3, "max_segment_count should never be exceeded");
   ringbuffer_close(&b);
 
@@ -76,9 +76,9 @@ char *test_ringbuffer_read() {
 char *all_tests() {
   mu_suite_start();
 
-  mu_run_test(test_ringbuffer_open);
+  // mu_run_test(test_ringbuffer_open);
   mu_run_test(test_ringbuffer_append);
-  mu_run_test(test_ringbuffer_read);
+  // mu_run_test(test_ringbuffer_read);
 
   return NULL;
 }

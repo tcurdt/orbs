@@ -10,9 +10,6 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <time.h>
-#include <ftw.h>
-
-#define _XOPEN_SOURCE 500
 #define UNUSED(expr) { (void)(expr); }
 
 #define OK 0

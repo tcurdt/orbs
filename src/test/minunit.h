@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <execinfo.h>
 #include <signal.h>
+#include "common.h"
 
 #define mu_suite_start() char *message = NULL
 #define mu_assert(test, message) if (!(test)) { return message; }

@@ -17,9 +17,9 @@ TESTS=$(patsubst %.c,%,${TEST_SOURCES})
 CFLAGS=-g -O2 -Wall -Wextra -Isrc/main -pthread -rdynamic -DNDEBUG $(OPTFLAGS) -D_FILE_OFFSET_BITS=64
 
 
-all: bin/${BINARY} tests
+all: build tests
 
-build: bin/${BINARY}
+build: bin/${BINARY} ${TESTS}
 
 bin/${BINARY}: ${LIB_OBJ} src/main/${BINARY}.o
 	@mkdir -p bin

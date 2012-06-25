@@ -1,9 +1,10 @@
-#include <stdio.h>
-#include <unistd.h> // sleep
+#include "common.h"
 
 #include "ringbuffer.h"
 
 int main(int argc, char **argv) {
+  UNUSED(argc);
+  UNUSED(argv);
 
   // sleep(20);
 

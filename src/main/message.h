@@ -9,4 +9,6 @@ struct message {
 };
 typedef struct message message;
 
+u_int32_t message_size(message* message);
+
 #endif

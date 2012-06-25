@@ -20,8 +20,7 @@ Under the hood the ringbuffer divides the space into segment files. This makes i
 
 The above example shows 4 segment files for service/ringbuffer ngix. 3 files have reached capacity. The last one is the one currenly open and being written to. The filename suggests a unix timestamp when the file was created, but by contract is really only an ever increasing number. In combination with the file offset it's a unique pointer at any message inside the ringbuffer ...and therefor is what needs to be stored on the pulling clients as state.
 
-![segments](segments.png)
-
+![segments](https://github.com/tcurdt/orbs/raw/master/docs/segments.png)
 
 ## Reading
 
@@ -29,7 +28,7 @@ The reading part is completely separate from the writing. A ringserver exposes a
 
  messages, new_timestamp, new_offset = get_messages(service, timestamp, offset, type, type_mask, every)
 
-![architecture](architecture.png)
+![architecture](https://github.com/tcurdt/orbs/raw/master/docs/architecture.png)
 
 Ringclients can collect data from all the ringservers. The service/timestamp/offset combination defines the state on the client side.
 The type/type_mask/every parameters can be used to tap into the events and create subsets of the data. For example every 10th message could be requested from the ringserver to creating a lower volume sample of the high volume data set. Another option would be to filter just on message type to e.g. extract message classified as "ERROR"s.

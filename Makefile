@@ -1,7 +1,7 @@
 platform := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
 PREFIX?=/usr/local
-BINARY=cafka
+BINARY=orbs
 INSTALL_BIN=$(PREFIX)/bin
 INSTALL=cp -pf
 

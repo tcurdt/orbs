@@ -1,162 +1,123 @@
 #include "common.h"
 #include "segments.h"
-#include <sys/stat.h>
-#include <unistd.h>
+
+static char* filename(const char *base_path, u_int32_t timestamp) {
+  size_t len = strlen(base_path) + 1 + 20 + 1;
+  char *ret = malloc(len);
+  if(!ret) return NULL;
+  snprintf(ret, len - 1, "%s/%d", base_path, timestamp);
+  return ret;
+}
+
+char* segments_segment_path(segments* segments, segment* segment) {
+  return filename(segments->base_path, segment->timestamp);
+}
 
 int segments_init(segments* segments) {
   segments->head = NULL;
-  segments->file = NULL;
   return OK;
 }
 
 int segments_destroy(segments* segments) {
   if (segments->head) {
+    segment* curr = segments->head;
+    segment* next;
+    while(curr != NULL) {
+      next = curr->next;
+      free(curr);
+      curr = next;
+    }
     segments->head = NULL;
   }
-  if (segments->file) {
-    segments->file = NULL;
-  }
   return OK;
 }
 
-int segments_head_write(segments* segments, message* message) {
-  FILE *file = segments->file;
-  if (!file) {
-    file = fopen(segments->head->full_path, "a");
-    if (!file) {
-      reterr("failed to open %s", segments->head->full_path);
-    }
-    segments->file = file;
-  }
-  size_t written, len, total = 0;
-
-  len = sizeof(u_int8_t);
-  written = fwrite((void*)&message->type, len, 1, file);
-  if (written != 1) reterr("failed to write %zd", written);
-  total += written;
-
-  len = sizeof(size_t);
-  written = fwrite((void*)&message->body_size, len, 1, file);
-  if (written != 1) reterr("failed to write %zd", written);
-  total += written;
-
-  len = message->body_size;
-  written = fwrite((void*)message->body, len, 1, file);
-  if (written != 1) reterr("failed to write %zd", written);
-  total += written;
-
-  len = sizeof(u_int32_t);
-  written = fwrite((void*)&message->crc32, len, 1, file);
-  if (written != 1) reterr("failed to write %zd", written);
-  total += written;
-
-  fflush(file);
-  segments->head->size += total;
-
-  return OK;
-}
-
-u_int32_t segments_head_size(segments* segments) {
+u_int32_t segments_size(segments* segments) {
   u_int32_t size = 0;
+
   segment* curr = segments->head;
   while(curr != NULL) {
     size += curr->size;
-    curr = curr->previous_segment;
+    curr = curr->next;
   }
+
   return size;
 }
 
 u_int32_t segments_count(segments* segments) {
   u_int32_t count = 0;
-  segment* head = segments->head;
-  segment* curr = head;
+
+  segment* curr = segments->head;
   while(curr != NULL) {
     count += 1;
-    curr = curr->previous_segment;
+    curr = curr->next;
   }
+
   return count;
 }
 
-int segments_pop(segments* segments) {
+segment* segments_pop(segments* segments) {
 
   segment* head = segments->head;
   segment* prev = NULL;
   segment* curr = head;
-  while(curr != NULL && curr->previous_segment != NULL) {
+  while(curr != NULL && curr->next != NULL) {
     prev = curr;
-    curr = curr->previous_segment;
+    curr = curr->next;
   }
+
   if (prev) {
-    prev->previous_segment = NULL;
+    // popping an element from the chain
+    prev->next = NULL;
   } else {
+    // popping the last element
     segments->head = NULL;
   }
 
-  if (curr) {
-    // close file
-    if (segments->file) {
-      fclose(segments->file);
-      segments->file = NULL;
-    }
-
-    // remove file
-    if (unlink(curr->full_path) != OK) {
-      reterr("failed to delete %s", curr->full_path);
-    }
-
-    free((void*)curr->full_path);
-    free(curr);
-  }
-
-  return OK;
+  return curr;
 }
 
-static const char* basename(const char *path) {
-  const char *base = strrchr(path, '/');
-  return base ? base + 1 : path;
-}
+int segments_add(segments* segments, u_int32_t timestamp) {
 
-int segments_add(segments* segments, const char *original_full_path) {
+  // continously increasing
+  if (segments->head) timestamp = MAX(timestamp, segments->head->timestamp + 1);
 
-  const char* full_path = strdup(original_full_path);
-  if (!full_path) reterr("failed to duplicate %s", original_full_path);
+  char* path = filename(segments->base_path, timestamp);
+  check(path, OOM);
 
   // check length
   u_int32_t size = 0;
   struct stat st;
-  if (stat(full_path, &st) == OK) {
-    if (!S_ISREG(st.st_mode)) {
-      reterr("not a regular file %s", full_path);
-    }
+  if (stat(path, &st) == OK) {
+    check(S_ISREG(st.st_mode), "not a regular file %s", path);
     size = st.st_size;
-    // maybe check a magic header?
+    // FIXME maybe check a magic header?
   }
-
-  // check timestamp
-  u_int32_t timestamp = atol(basename(full_path));
-  if (timestamp <= 0) {
-    reterr("not a segment file %s", full_path);
-  }
+  free(path);
 
   segment* new_segment = malloc(sizeof(segment));
-  if (!new_segment) reterr("out of memory");
-  new_segment->full_path = full_path;
+  check(new_segment, OOM);
   new_segment->timestamp = timestamp;
   new_segment->size = size;
+  new_segment->count = 0;
 
   segment* head = segments->head;
   segment* prev = NULL;
   segment* curr = head;
   while(curr != NULL && new_segment->timestamp < curr->timestamp) {
     prev = curr;
-    curr = curr->previous_segment;
+    curr = curr->next;
   }
+
   if (prev) {
-    new_segment->previous_segment = prev->previous_segment;
-    prev->previous_segment = new_segment;
+    // insert into chain
+    new_segment->next = prev->next;
+    prev->next = new_segment;
   } else {
-    new_segment->previous_segment = head;
+    // new segments head
+    new_segment->next = head;
     segments->head = new_segment;
   }
+
   return OK;
 }

@@ -1,9 +1,34 @@
 #include "minunit.h"
 #include <assert.h>
-// #include <stdio.h>
-#include "string.h"
-
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "ringbuffer.h"
+#include "message.h"
+
+static const char* tmp_create() {
+  char *pattern = mktemp(strdup("test-XXXXXXXX"));
+  if (mkdir(pattern, 0777) != OK) {
+    return NULL;
+  }
+  return pattern;
+}
+
+static int tmp_remove_file(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
+  UNUSED(sb);
+  UNUSED(typeflag);
+  UNUSED(ftwbuf);
+  return remove(fpath);
+}
+static void tmp_remove(const char* path) {
+  if (path == NULL) return;
+  nftw(path, tmp_remove_file, 64, FTW_DEPTH | FTW_PHYS);
+  free((void*)path);
+}
+
+static int file_exists(const char* path) {
+  return (access(path, F_OK) != -1) ? true : false;
+}
 
 static u_int32_t sum_timestamps(ringbuffer* buffer) {
   u_int32_t sum = 0;
@@ -13,7 +38,7 @@ static u_int32_t sum_timestamps(ringbuffer* buffer) {
   segment* curr = segments->head;
   while(curr != NULL) {
     sum += curr->timestamp << order;
-    curr = curr->previous_segment;
+    curr = curr->next;
     l += 1;
     order += 1;
   }
@@ -44,41 +69,74 @@ char *test_ringbuffer_open() {
   return NULL;
 }
 
-char *test_ringbuffer_append() {
+char *test_ringbuffer_should_not_grow_beyond_limits() {
 
-  ringbuffer b;
-  b.max_segment_count = 3;
-  b.max_segment_size = 1;
+  const char *tmp_path;
+  int i;
 
   message m;
   m.type = 1;
-  m.body = "body";
+  m.body = "012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
   m.body_size = strlen(m.body);
   m.crc32 = 0;
 
-  ringbuffer_open("/tmp/tests", &b);
-  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
-  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
-  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
-  mu_assert(segments_count(&b.segments) == 3, "each append should have started a new segment file (body > max_segment_size)");
-  mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
-  mu_assert(segments_count(&b.segments) == 3, "max_segment_count should never be exceeded");
+  u_int32_t m_size = message_size(&m);
+
+  ringbuffer b;
+  b.max_segment_count = 3;
+  b.max_segment_size = m_size * 100 - 1; // after 100 messages we need a new segment
+
+  tmp_path = tmp_create();
+  ringbuffer_open(tmp_path, &b);
+
+  mu_assert(segments_count(&b.segments) == 1, "segment count should be 1");
+  for(i=0;i<100;i++) {
+    mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
+  }
+
+  mu_assert(segments_count(&b.segments) == 2, "segment count should be 2");
+  for(i=0;i<100;i++) {
+    mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
+  }
+
+  mu_assert(segments_count(&b.segments) == 3, "segment count should be 3");
+  for(i=0;i<100;i++) {
+    mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
+  }
+
+  mu_assert(segments_count(&b.segments) == 3, "segment count should be still 3");
+  for(i=0;i<100;i++) {
+    mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
+  }
+  mu_assert(segments_count(&b.segments) == 3, "segment count should be still 3");
+  mu_assert(ringbuffer_size(&b) == (4+99+99+99 - 99) * m_size, "should have dropped 99");
+
+  // check each segment file exists
+  segments* segments = &b.segments;
+  segment* curr = segments->head;
+  while(curr != NULL) {
+    char* path = segments_segment_path(segments, curr);
+    mu_assert(file_exists(path) == true, "file does not exist");
+    free(path);
+    curr = curr->next;
+  }
+
   ringbuffer_close(&b);
+  tmp_remove(tmp_path);
 
   return NULL;
 }
 
-char *test_ringbuffer_read() {
-  mu_assert(1, "Failed to read");
-  return NULL;
-}
+// char *test_ringbuffer_read() {
+//   mu_assert(1, "Failed to read");
+//   return NULL;
+// }
 
 char *all_tests() {
   mu_suite_start();
 
   // mu_run_test(test_ringbuffer_open);
-  mu_run_test(test_ringbuffer_append);
-  // mu_run_test(test_ringbuffer_read);
+  mu_run_test(test_ringbuffer_should_not_grow_beyond_limits);
 
   return NULL;
 }

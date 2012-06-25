@@ -6,11 +6,9 @@
 #define _XOPEN_SOURCE 500
 
 const char* tmp_create() {
-  char *pattern = mktemp(strdup("orbs-XXXXXXXX"));
-  if (mkdir(pattern, 0777) != OK) {
-    return NULL;
-  }
-  return pattern;
+  char *path = mkdtemp(strdup("/tmp/orbs-XXXXXX"));
+  assert(path);
+  return path;
 }
 
 static int tmp_remove_file(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {

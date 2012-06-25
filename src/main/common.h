@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <time.h>
+#include <assert.h>
 #define UNUSED(expr) { (void)(expr); }
 
 #define OK 0

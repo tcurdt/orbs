@@ -1,5 +1,4 @@
 #include "minunit.h"
-#include <assert.h>
 #include "message.h"
 
 char *test_message_size() {

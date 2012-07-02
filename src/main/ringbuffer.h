@@ -14,7 +14,7 @@ struct ringbuffer {
 };
 
 void ringbuffer_print(ringbuffer* buffer);
-  
+
 int ringbuffer_open(const char* base_path, ringbuffer* buffer);
 int ringbuffer_close(ringbuffer* buffer);
 

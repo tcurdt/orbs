@@ -67,34 +67,37 @@ char *test_ringbuffer_should_not_grow_beyond_limits() {
 
   u_int32_t m_size = message_size(&m);
 
+  int fill = 10;
+
   ringbuffer b;
   b.max_segment_count = 3;
-  b.max_segment_size = m_size * 100 - 1; // after 100 messages we need a new segment
+  b.max_segment_size = (m_size * fill) - 1; // cannot fit all fill messages into one segment
 
   tmp_path = tmp_create();
   ringbuffer_open(tmp_path, &b);
 
   mu_assert(segments_count(&b.segments) == 1, "segment count should be 1");
-  for(i=0;i<100;i++) {
+  for(i=0;i<fill;i++) {
     mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
   }
 
   mu_assert(segments_count(&b.segments) == 2, "segment count should be 2");
-  for(i=0;i<100;i++) {
+  for(i=0;i<fill;i++) {
     mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
   }
 
   mu_assert(segments_count(&b.segments) == 3, "segment count should be 3");
-  for(i=0;i<100;i++) {
+  for(i=0;i<fill;i++) {
     mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
   }
 
   mu_assert(segments_count(&b.segments) == 3, "segment count should be still 3");
-  for(i=0;i<100;i++) {
+  for(i=0;i<fill;i++) {
     mu_assert(ringbuffer_append(&b, &m) == OK, "failed to append");
   }
+
   mu_assert(segments_count(&b.segments) == 3, "segment count should be still 3");
-  mu_assert(ringbuffer_size(&b) == (4+99+99+99 - 99) * m_size, "should have dropped 99");
+  mu_assert(ringbuffer_size(&b) == (4 + 2 * (fill-1)) * m_size, "should have dropped fill-1 messages");
 
   // check each segment file exists
   segments* segments = &b.segments;

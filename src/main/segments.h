@@ -21,10 +21,13 @@ struct segment {
 typedef struct segments segments;
 struct segments {
   const char* base_path;
-  segment*    head;
+  segment*    head; // oldest
+  segment*    tail; // newest
 };
 
 char* segments_segment_path(segments* segments, segment* segment);
+
+void segments_print(segments* segments);
 
 int segments_init(segments* segments);
 int segments_destroy(segments* segments);

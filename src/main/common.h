@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <assert.h>
+#include <fcntl.h>
 #define UNUSED(expr) { (void)(expr); }
 
 #define OK 0

@@ -1,42 +1,73 @@
 #include "common.h"
 #include "ringbuffer.h"
 #include "segments.h"
-#include "crc.h"
+
+static char* filename(const char *base_path, u_int32_t timestamp) {
+  size_t len = strlen(base_path) + 1 + 20 + 1;
+  char *ret = malloc(len);
+  if(!ret) return NULL;
+  snprintf(ret, len - 1, "%s/%d", base_path, timestamp);
+  ret[len-1] = 0;
+  return ret;
+}
+
+static int ringbuffer_add_segment(ringbuffer* buffer, u_int32_t timestamp) {
+  check(buffer->base_path, "needs base_path");
+
+  u_int32_t size = 0;
+
+  // check length
+  char* path = filename(buffer->base_path, timestamp);
+  check(path, OOM);
+  struct stat st;
+  if (stat(path, &st) == OK) {
+    check(S_ISREG(st.st_mode), "not a regular file %s", path);
+    size = st.st_size;
+  }
+  free(path);
+
+  buffer->total_size += size;
+
+  return segments_add(&buffer->segments, timestamp, size);
+}
 
 void ringbuffer_print(ringbuffer* buffer) {
   return segments_print(&buffer->segments);
 }
 
-int ringbuffer_open(const char *original_base_path, ringbuffer* buffer) {
+int ringbuffer_open(ringbuffer* buffer) {
+  check(buffer->max_total_size > 0, "needs max_total_size");
+  check(buffer->max_segment_size > 0, "needs max_segment_size");
+  check(buffer->max_total_size >= (3 * buffer->max_segment_size), "max_total_size must be 3x larger than max_segment_size");
+  check(buffer->base_path, "needs base_path");
 
-  // copy base path
-  const char* base_path = strdup(original_base_path);
-  check(base_path, OOM);
-
-  // init segments
+  // init
   segments* segments = &buffer->segments;
   check(segments_init(segments) == OK, "segments_init failed");
-  segments->base_path = base_path;
+  buffer->total_size = 0;
 
   // scan through dir
-  DIR* dir = opendir(base_path);
-  check(dir, "failed to open dir %s", base_path);
+  DIR* dir = opendir(buffer->base_path);
+  check(dir, "failed to open dir %s", buffer->base_path);
   struct dirent *entry;
   while ((entry = readdir(dir)) != NULL) {
     u_int32_t timestamp = atol(entry->d_name);
     if (timestamp > 0) {
-      check(segments_add(segments, timestamp) == OK, "segments_add failed");
+      check(ringbuffer_add_segment(buffer, timestamp) == OK, "ringbuffer_add_segment failed");
     }
   }
   closedir(dir);
 
-  // always create a new segment after restart
-  check(segments_add(segments, time(NULL)) == OK, "segments_add failed");
+  // always create a new empty segment after restart
+  u_int32_t timestamp = time(NULL);
+  check(ringbuffer_add_segment(buffer, timestamp) == OK, "ringbuffer_add_segment failed");
+  check(segments->tail->timestamp == timestamp, "new segment should be newest");
+  check(segments->tail->size == 0, "new segment should be empty");
 
   // open the file
-  char* path = segments_segment_path(segments, segments->head);
-  buffer->file = fopen(path, "a");
-  check(buffer->file, "failed to open segment file %s", path);
+  char* path = filename(buffer->base_path, segments->tail->timestamp);
+  buffer->fd = open(path, O_CREAT|O_APPEND);
+  check(buffer->fd > 0, "failed to open segment file %s", path);
   free(path);
 
   return OK;
@@ -44,36 +75,37 @@ int ringbuffer_open(const char *original_base_path, ringbuffer* buffer) {
 
 int ringbuffer_close(ringbuffer* buffer) {
   check(segments_destroy(&buffer->segments) == OK, "segments_destroy failed");
+  check(fsync(buffer->fd) == OK, "failed to fsync");
+  check(close(buffer->fd) == OK, "failed to close");
+  buffer->fd = ERROR;
+  if (buffer->base_path) free((char*)buffer->base_path);
   return OK;
 }
 
-u_int32_t ringbuffer_size(ringbuffer* buffer) {
-  return segments_size(&buffer->segments);
-}
-
-int ringbuffer_append(ringbuffer* buffer, message* message) {
+int ringbuffer_append(ringbuffer* buffer, void* message, u_int32_t message_length) {
   segments* segments = &buffer->segments;
 
   segment* newest = segments->tail;
   check(newest, "should have a newest segment");
 
   // check if message fits into current segment file
-  if ((newest->size + message_size(message)) >= buffer->max_segment_size) {
+  if ((newest->size + message_length) >= buffer->max_segment_size) {
     // newest segment full
 
     // close the current file
-    check(buffer->file, "should have a file");
-    fclose(buffer->file), buffer->file = NULL;
+    check(buffer->fd > 0, "no file");
+    check(close(buffer->fd) == OK, "failed to close");
+    buffer->fd = ERROR;
 
     // check if we have reached the maximum ringbuffer size
-    if ((segments_count(segments) + 1) > buffer->max_segment_count) {
+    if ((buffer->total_size + message_length) >= buffer->max_total_size) {
 
       // remove oldest
       segment* oldest = segments_pop(segments);
       check(oldest, "should have an oldest segment");
 
       // remove file
-      char* path = segments_segment_path(segments, oldest);
+      char* path = filename(buffer->base_path, oldest->timestamp);
       check(unlink(path) == OK, "failed to delete %s", path);
       free(path);
 
@@ -81,53 +113,31 @@ int ringbuffer_append(ringbuffer* buffer, message* message) {
     }
 
     // create new segment
-    check(segments_add(segments, time(NULL)) == OK, "segments_add failed");
+    check(segments_add(segments, time(NULL), 0) == OK, "segments_add failed");
 
     // open the file
-    char* path = segments_segment_path(segments, segments->tail);
-    buffer->file = fopen(path, "a");
-    check(buffer->file, "failed to open segment file %s", path);
+    char* path = filename(buffer->base_path, segments->tail->timestamp);
+    buffer->fd = open(path, O_CREAT|O_APPEND);
+    check(buffer->fd > 0, "failed to open segment file %s", path);
     free(path);
   }
 
-  // calculate checksum
-  message->crc32 = crc32_buffer((const char *)message->body, message->body_size);
+  check(write(buffer->fd, message, message_length) != message_length,
+    "failed to write %d bytes", message_length);
 
-  // write message to file
-  size_t len, total = 0;
-  FILE* file = buffer->file;
+  // fsync every n-th message
+  if (segments->tail->messages % buffer->sync_freq == 0) {
+    fsync(buffer->fd);
+  }
 
-  len = sizeof(u_int8_t);
-  check(fwrite((void*)&message->type, len, 1, file) == 1,
-    "failed to write %zd bytes", len);
-  total += len;
-
-  len = sizeof(size_t);
-  check(fwrite((void*)&message->body_size, len, 1, file) == 1,
-    "failed to write %zd bytes", len);
-  total += len;
-
-  len = message->body_size;
-  check(fwrite((void*)message->body, len, 1, file) == 1,
-    "failed to write %zd bytes", len);
-  total += len;
-
-  len = sizeof(u_int32_t);
-  check(fwrite((void*)&message->crc32, len, 1, file) == 1,
-    "failed to write %zd bytes", len);
-  total += len;
-
-  fflush(file);
-  fsync(fileno(file));
-  segments->tail->size += total;
-  segments->tail->count += 1;
+  segments->tail->size += message_length;
+  segments->tail->messages += 1;
+  buffer->total_size += message_length;
 
   return OK;
 }
 
-int ringbuffer_read(ringbuffer* buffer, position* position, message* message) {
-  UNUSED(buffer);
-  UNUSED(position);
-  UNUSED(message);
-  return OK;
+u_int32_t ringbuffer_size(ringbuffer* buffer) {
+  return buffer->total_size;
 }
+

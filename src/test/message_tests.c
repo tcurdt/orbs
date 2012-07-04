@@ -20,7 +20,7 @@ char *test_message_size() {
   return NULL;
 }
 
-char *all_tests() {
+char *suite() {
   mu_suite_start();
 
   mu_run_test(test_message_size);
@@ -28,4 +28,4 @@ char *all_tests() {
   return NULL;
 }
 
-RUN_TESTS(all_tests);
+RUN_SUITE(suite);

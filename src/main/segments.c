@@ -1,32 +1,17 @@
 #include "common.h"
 #include "segments.h"
 
-static char* filename(const char *base_path, u_int32_t timestamp) {
-  size_t len = strlen(base_path) + 1 + 20 + 1;
-  char *ret = malloc(len);
-  if(!ret) return NULL;
-  snprintf(ret, len - 1, "%s/%d", base_path, timestamp);
-  ret[len-1] = 0;
-  return ret;
-}
-
 void segments_print(segments* segments) {
-  printf("segments: %d = { ", segments_size(segments));
+  printf("segments: %d = { ", segments_count(segments));
   segment* segment = segments->head;
   while(segment != NULL) {
-    printf("%d:{ %d/%d } ", segment->timestamp, segment->size, segment->count);
+    printf("%d:{ %d/%d } ", segment->timestamp, segment->size, segment->messages);
     segment = segment->next;
   }
   printf("}\n");
 }
 
-
-char* segments_segment_path(segments* segments, segment* segment) {
-  return filename(segments->base_path, segment->timestamp);
-}
-
 int segments_init(segments* segments) {
-  segments->base_path = NULL;
   segments->head = NULL;
   segments->tail = NULL;
   return OK;
@@ -81,31 +66,17 @@ segment* segments_pop(segments* segments) {
   return head;
 }
 
-int segments_add(segments* segments, u_int32_t timestamp) {
+int segments_add(segments* segments, u_int32_t timestamp, u_int32_t size) {
 
   // continously increasing
   if (segments->tail) timestamp = MAX(timestamp, segments->tail->timestamp + 1);
 
-  u_int32_t size = 0;
-
-  // check length
-  if (segments->base_path) {
-    char* path = filename(segments->base_path, timestamp);
-    check(path, OOM);
-    struct stat st;
-    if (stat(path, &st) == OK) {
-      check(S_ISREG(st.st_mode), "not a regular file %s", path);
-      size = st.st_size;
-      // FIXME maybe check a magic header?
-    }
-    free(path);
-  }
-
+  // create segment
   segment* new_segment = malloc(sizeof(segment));
   check(new_segment, OOM);
   new_segment->timestamp = timestamp;
   new_segment->size = size;
-  new_segment->count = 0;
+  new_segment->messages = 0;
 
   segment* head = segments->head;
   segment* prev = NULL;

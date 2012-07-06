@@ -88,6 +88,23 @@ int ringbuffer_append(ringbuffer* buffer, void* message, u_int32_t message_lengt
   segment* newest = segments->tail;
   check(newest, "should have a newest segment");
 
+  // check if we have reached the maximum ringbuffer size
+  if ((buffer->total_size + message_length) >= buffer->max_total_size) {
+
+    // remove oldest
+    segment* oldest = segments_pop(segments);
+    check(oldest, "should have an oldest segment");
+
+    // remove file
+    char* path = filename(buffer->base_path, oldest->timestamp);
+    check(unlink(path) == OK, "failed to delete %s", path);
+    free(path);
+
+    buffer->total_size -= oldest->size;
+
+    free(oldest);
+  }
+
   // check if message fits into current segment file
   if ((newest->size + message_length) >= buffer->max_segment_size) {
     // newest segment full
@@ -96,21 +113,6 @@ int ringbuffer_append(ringbuffer* buffer, void* message, u_int32_t message_lengt
     check(buffer->fd > 0, "no file");
     check(close(buffer->fd) == OK, "failed to close");
     buffer->fd = ERROR;
-
-    // check if we have reached the maximum ringbuffer size
-    if ((buffer->total_size + message_length) >= buffer->max_total_size) {
-
-      // remove oldest
-      segment* oldest = segments_pop(segments);
-      check(oldest, "should have an oldest segment");
-
-      // remove file
-      char* path = filename(buffer->base_path, oldest->timestamp);
-      check(unlink(path) == OK, "failed to delete %s", path);
-      free(path);
-
-      free(oldest);
-    }
 
     // create new segment
     check(segments_add(segments, time(NULL), 0) == OK, "segments_add failed");

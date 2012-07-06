@@ -10,7 +10,7 @@
 
 #define mu_suite_start() char *message = NULL
 #define mu_assert(condition, format, args...) if ((condition)) { printf("-"); } else { char* s = malloc(200); snprintf(s, 200, "line %d: " format, __LINE__, ##args); s[200] = 0; return s; }
-#define mu_run_test(test) { printf("+"); message = test(); if (message) { printf("\n  ERROR in test %s:\n    %s", #test, message); return message; }}
+#define mu_run_test(test) { printf("+"); message = test(); if (message) { printf("\n  ERROR in %s:\n    %s", #test, message); return message; }}
 
 #define RUN_SUITE(suite) void handler(int sig) { \
   void *array[10]; \

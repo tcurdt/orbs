@@ -41,7 +41,7 @@ void ringbuffer_print(ringbuffer* buffer) {
 int ringbuffer_open(ringbuffer* buffer) {
   check(buffer->max_total_size > 0, "needs max_total_size");
   check(buffer->max_segment_size > 0, "needs max_segment_size");
-  check(buffer->max_total_size >= (3 * buffer->max_segment_size), "max_total_size must be 3x larger than max_segment_size");
+  check(buffer->max_total_size >= (3 * buffer->max_segment_size), "max_total_size must be 3x larger than max_segment_size (%d >= 3 * %d)", buffer->max_total_size, buffer->max_segment_size);
   check(buffer->base_path, "needs base_path");
 
   // init

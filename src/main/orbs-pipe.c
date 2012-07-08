@@ -17,22 +17,59 @@ u_int64_t timeval_diff(struct timeval* e, struct timeval* s) {
 }
 
 
-static void usage() {
-  printf("usage\n");
+static void usage(char **argv) {
+  fprintf(stderr, "Usage: %s [-t max_total_size] [-s max_segment_size] [-f sync_freq] dir\n", argv[0]);
   exit(-1);
 }
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    usage();
+
+  int opt;
+
+  // default parameters
+  u_int32_t max_segment_size = 10000000;
+  u_int32_t max_total_size = 4 * max_segment_size;
+  u_int32_t sync_freq = 100;
+  char*     base_path = "buffer";
+
+  while ((opt = getopt(argc, argv, "f:s:t:")) != -1) {
+    switch (opt) {
+      case 't':
+        max_total_size = atoi(optarg);
+        break;
+      case 's':
+        max_segment_size = atoi(optarg);
+        break;
+      case 'f':
+        sync_freq = atoi(optarg);
+        break;
+      default: usage(argv);
+    }
   }
 
+  if (optind >= argc) {
+    usage(argv);
+  }
+
+  base_path = argv[optind];
+
+  printf("max_total_size=%d; max_segment_size=%d; sync_freq=%d; base_path=%s\n",
+    max_total_size, max_segment_size, sync_freq, base_path);
+
+
+  // for benchmarking
+  size_t total_bytes = 0;
+  size_t total_messages = 0;
+  struct timeval start, end;
+
+
+  // setup ringbuffer
   ringbuffer rb;
-  rb.base_path = strdup(argv[1]);
-  rb.max_segment_size = 10000000;
-  rb.max_total_size = 3 * rb.max_segment_size;
-  rb.sync_freq = 100;
-  
+  rb.base_path = strdup(base_path);
+  rb.max_segment_size = max_segment_size;
+  rb.max_total_size = max_total_size;
+  rb.sync_freq = sync_freq;
+
   if (ringbuffer_open(&rb) != OK) {
     fprintf(stderr, "failed to open ringbuffer\n");
     exit(-1);
@@ -46,16 +83,11 @@ int main(int argc, char **argv) {
   size_t message_len = 0;
   size_t message_len_max = 0;
 
-  size_t total_bytes = 0;
-  size_t total_messages = 0;
-
-  struct timeval start, end;
   gettimeofday(&start, NULL);
 
   while(1) {
 
     ssize_t bytes_read = read(STDIN_FILENO, read_buffer, read_buffer_len);
-
     if (bytes_read <= 0) break;
 
     total_bytes += bytes_read;
@@ -80,14 +112,11 @@ int main(int argc, char **argv) {
           read_buffer = realloc(read_buffer, read_buffer_len);
         }
 
-        // printf("message: %s\n", message_buffer);
-        // printf("len=%zd max=%zd\n", message_len, message_len_max);
-
         ringbuffer_append(&rb, message_buffer, message_len);
 
-        total_messages += 1;
-
         message_len = 0;
+
+        total_messages += 1;
       } else {
         message_buffer[message_len++] = c;
       }

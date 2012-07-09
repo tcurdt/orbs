@@ -34,14 +34,14 @@ int main(int argc, char **argv) {
 
   while ((opt = getopt(argc, argv, "f:s:t:")) != -1) {
     switch (opt) {
+      case 'f':
+        sync_freq = atoi(optarg);
+        break;
       case 't':
         max_total_size = atoi(optarg);
         break;
       case 's':
         max_segment_size = atoi(optarg);
-        break;
-      case 'f':
-        sync_freq = atoi(optarg);
         break;
       default: usage(argv);
     }
@@ -53,8 +53,8 @@ int main(int argc, char **argv) {
 
   base_path = argv[optind];
 
-  printf("max_total_size=%d; max_segment_size=%d; sync_freq=%d; base_path=%s\n",
-    max_total_size, max_segment_size, sync_freq, base_path);
+  // printf("max_total_size=%d; max_segment_size=%d; sync_freq=%d; base_path=%s\n",
+  //   max_total_size, max_segment_size, sync_freq, base_path);
 
 
   // for benchmarking
@@ -132,7 +132,8 @@ int main(int argc, char **argv) {
 
   u_int64_t duration = timeval_diff(&end, &start);
 
-  printf("%zd messages, %zd bytes in %1.1fs, %1.1f bytes/s\n", total_messages, total_bytes, (double)duration/1000000, (double)total_bytes*1000000/duration);
+  // printf("%zd messages, %zd bytes in %1.1fs, %1.1f bytes/s\n", total_messages, total_bytes, (double)duration/1000000, (double)total_bytes*1000000/duration);
+  printf("%1.1f\n", (double)total_bytes*1000000/duration);
 
   return 0;
 }

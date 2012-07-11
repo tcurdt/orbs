@@ -3,21 +3,6 @@
 #include "message.h"
 #include "unixy.h"
 
-// static u_int32_t sum_timestamps(ringbuffer* buffer) {
-//   u_int32_t sum = 0;
-//   int l = 0;
-//   int order = 0;
-//   segments* segments = &buffer->segments;
-//   segment* curr = segments->head;
-//   while(curr != NULL) {
-//     sum += curr->timestamp << order;
-//     curr = curr->next;
-//     l += 1;
-//     order += 1;
-//   }
-//   return sum + l;
-// }
-
 char *test_ringbuffer_should_open_segments_from_disk() {
 
   const char *tmp_path;
@@ -28,28 +13,31 @@ char *test_ringbuffer_should_open_segments_from_disk() {
   b.sync_freq = 1;
 
   tmp_path = tmp_create();
+  mu_assert(tmp_path, "failed to create tmp");
   b.base_path = strdup(tmp_path);
-  ringbuffer_open(&b);
+  mu_assert(ringbuffer_open(&b) == OK, "failed ringbuffer_open");
   mu_assert(ringbuffer_size(&b) == 0, "size is not zero (%d)", ringbuffer_size(&b));
-  ringbuffer_close(&b);
+  mu_assert(ringbuffer_close(&b) == OK, "failed ringbuffer_close");
   tmp_remove(tmp_path);
 
   tmp_path = tmp_create();
+  mu_assert(tmp_path, "failed to create tmp");
   b.base_path = strdup(tmp_path);
   file_write(tmp_path, "1340423024", "1");
-  ringbuffer_open(&b);
+  mu_assert(ringbuffer_open(&b) == OK, "failed ringbuffer_open");
   mu_assert(ringbuffer_size(&b) == 1, "size is wrong (%d)", ringbuffer_size(&b));
-  ringbuffer_close(&b);
+  mu_assert(ringbuffer_close(&b) == OK, "failed ringbuffer_close");
   tmp_remove(tmp_path);
 
   tmp_path = tmp_create();
+  mu_assert(tmp_path, "failed to create tmp");
   b.base_path = strdup(tmp_path);
   file_write(tmp_path, "1340423024", "1");
   file_write(tmp_path, "1340423025", "12");
   file_write(tmp_path, "1340423026", "123");
-  ringbuffer_open(&b);
+  mu_assert(ringbuffer_open(&b) == OK, "failed ringbuffer_open");
   mu_assert(ringbuffer_size(&b) == (1 + 2 + 3), "size is wrong(%d)", ringbuffer_size(&b));
-  ringbuffer_close(&b);
+  mu_assert(ringbuffer_close(&b) == OK, "failed ringbuffer_close");
   tmp_remove(tmp_path);
 
   return NULL;
@@ -66,6 +54,7 @@ char *test_ringbuffer_should_not_grow_beyond_limits() {
   int fill = 10;
 
   tmp_path = tmp_create();
+  mu_assert(tmp_path, "failed to create tmp");
 
   ringbuffer b;
   b.max_segment_size = (m_size * fill) - 1; // cannot fit all fill messages into one segment

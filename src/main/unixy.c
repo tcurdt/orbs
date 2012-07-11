@@ -1,11 +1,5 @@
-#define _XOPEN_SOURCE 700 // http://stackoverflow.com/questions/782338/warning-with-nftw
-
 #include "unixy.h"
 #include "common.h"
-
-#include <ftw.h>
-#include <stdlib.h>
-#include <fcntl.h>
 
 const char* tmp_create() {
   char *path = mkdtemp(strdup("/tmp/orbs-XXXXXX"));
@@ -21,7 +15,7 @@ static int tmp_remove_file(const char* fpath, const struct stat* sb, int typefla
 }
 
 int tmp_remove(const char* path) {
-  if (path == NULL) return ERROR;
+  if (path) return ERROR;
   nftw(path, tmp_remove_file, 64, FTW_DEPTH | FTW_PHYS);
   free((void*)path);
   return OK;

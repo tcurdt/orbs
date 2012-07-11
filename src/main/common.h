@@ -12,6 +12,9 @@
 #include <time.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <ftw.h>
+#include <stdlib.h>
+
 #define UNUSED(expr) { (void)(expr); }
 
 #define OK 0

@@ -50,7 +50,7 @@ clean:
 	@rm -f ${TESTS}
 	@rm -f src/test/tests.log
 
-tests: ${TESTS}
+tests: build ${TESTS}
 	@echo
 	@echo Running tests:
 	@sh ./src/test/run.sh

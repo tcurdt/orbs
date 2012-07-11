@@ -7,13 +7,14 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <dirent.h>
 #include <time.h>
 #include <assert.h>
 #include <fcntl.h>
 #include <ftw.h>
 #include <stdlib.h>
+#undef _POSIX_C_SOURCE
+#include <unistd.h>
 
 #define UNUSED(expr) { (void)(expr); }
 

@@ -18,7 +18,7 @@
 #define UNUSED(expr) { (void)(expr); }
 
 #ifdef __linux__
-#define FSYNC(fd) fsyncdata(fd)
+#define FSYNC(fd) fdatasync(fd)
 #else
 #define FSYNC(fd) fsync(fd)
 #endif

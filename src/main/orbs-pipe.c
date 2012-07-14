@@ -29,14 +29,23 @@ int main(int argc, char **argv) {
   // default parameters
   u_int32_t max_segment_size = 10000000;
   u_int32_t max_total_size = 4 * max_segment_size;
-  u_int32_t sync_freq = 100;
+  u_int32_t sync_freq = 1;
+  int       sync_type = RINGBUFFER_SYNC_ALWAYS;
   char*     base_path = "buffer";
 
   while ((opt = getopt(argc, argv, "f:s:t:")) != -1) {
     switch (opt) {
-      case 'f':
+      case 'f': {
+        int len = strlen(optarg);
+        switch(optarg[len - 1]) {
+          case 's': sync_type = RINGBUFFER_SYNC_SECONDS; break;
+          case 'x': sync_type = RINGBUFFER_SYNC_COUNTS; break;
+          default: usage(argv);
+        }
+        optarg[len - 1] = 0;
         sync_freq = atoi(optarg);
         break;
+      }
       case 't':
         max_total_size = atoi(optarg);
         break;

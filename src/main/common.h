@@ -17,6 +17,12 @@
 
 #define UNUSED(expr) { (void)(expr); }
 
+#ifdef __linux__
+#define FSYNC(fd) fsyncdata(fd)
+#else
+#define FSYNC(fd) fsync(fd)
+#endif
+
 #define OK 0
 #define ERROR -1
 

@@ -11,6 +11,7 @@ char *test_ringbuffer_should_open_segments_from_disk() {
   b.max_segment_size = 50;
   b.max_total_size = 3 * b.max_segment_size;
   b.sync_freq = 1;
+  b.sync_type = RINGBUFFER_SYNC_ALWAYS;
 
   tmp_path = tmp_create();
   mu_assert(tmp_path, "failed to create tmp");
@@ -60,6 +61,7 @@ char *test_ringbuffer_should_not_grow_beyond_limits() {
   b.max_segment_size = (m_size * fill) - 1; // cannot fit all fill messages into one segment
   b.max_total_size = 3 * b.max_segment_size;
   b.sync_freq = 1;
+  b.sync_type = RINGBUFFER_SYNC_ALWAYS;
   b.base_path = strdup(tmp_path);
 
   ringbuffer_open(&b);

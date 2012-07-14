@@ -2,7 +2,7 @@
 #include "ringbuffer.h"
 #include "segments.h"
 
-#define FILE_OPEN   O_CREAT | O_EXCL | O_WRONLY | O_APPEND // | O_SYNC
+#define FILE_OPEN   O_CREAT | O_EXCL | O_WRONLY | O_APPEND
 #define FILE_PERMS  0640
 
 static char* filename(const char *base_path, u_int32_t timestamp) {
@@ -69,7 +69,7 @@ int ringbuffer_open(ringbuffer* buffer) {
 
   // open the file
   char* path = filename(buffer->base_path, segments->tail->timestamp);
-  buffer->fd = open(path, FILE_OPEN, FILE_PERMS);
+  buffer->fd = open(path, (buffer->sync_type == RINGBUFFER_SYNC_ALWAYS) ? FILE_OPEN | O_SYNC : FILE_OPEN, FILE_PERMS);
   check(buffer->fd > 0, "failed to open segment file %s", path);
   free(path);
 
@@ -122,7 +122,7 @@ int ringbuffer_append(ringbuffer* buffer, void* message, u_int32_t message_lengt
 
     // open the file
     char* path = filename(buffer->base_path, segments->tail->timestamp);
-    buffer->fd = open(path, FILE_OPEN, FILE_PERMS);
+    buffer->fd = open(path, (buffer->sync_type == RINGBUFFER_SYNC_ALWAYS) ? FILE_OPEN | O_SYNC : FILE_OPEN, FILE_PERMS);
     check(buffer->fd > 0, "failed to open segment file %s", path);
     free(path);
   }
@@ -130,9 +130,11 @@ int ringbuffer_append(ringbuffer* buffer, void* message, u_int32_t message_lengt
   check(write(buffer->fd, message, message_length) == message_length,
     "failed to write %d bytes", message_length);
 
-  // fsync every n-th message
-  if (segments->tail->messages % buffer->sync_freq == 0) {
-    fsync(buffer->fd);
+  if (buffer->sync_type == RINGBUFFER_SYNC_COUNTS) {
+    // fsync every n-th message
+    if (segments->tail->messages % buffer->sync_freq == 0) {
+      FSYNC(buffer->fd);
+    }
   }
 
   segments->tail->size += message_length;

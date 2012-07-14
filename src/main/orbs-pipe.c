@@ -62,8 +62,8 @@ int main(int argc, char **argv) {
 
   base_path = argv[optind];
 
-  // printf("max_total_size=%d; max_segment_size=%d; sync_freq=%d; base_path=%s\n",
-  //   max_total_size, max_segment_size, sync_freq, base_path);
+  printf("max_total_size=%d; max_segment_size=%d; sync_freq=%d; sync_type=%d; base_path=%s\n",
+    max_total_size, max_segment_size, sync_freq, sync_type, base_path);
 
 
   // for benchmarking
@@ -78,6 +78,7 @@ int main(int argc, char **argv) {
   rb.max_segment_size = max_segment_size;
   rb.max_total_size = max_total_size;
   rb.sync_freq = sync_freq;
+  rb.sync_type = sync_type;
 
   if (ringbuffer_open(&rb) != OK) {
     fprintf(stderr, "failed to open ringbuffer\n");

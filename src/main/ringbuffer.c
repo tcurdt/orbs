@@ -2,7 +2,7 @@
 #include "ringbuffer.h"
 #include "segments.h"
 
-#define FILE_OPEN   O_CREAT | O_EXCL | O_WRONLY | O_APPEND
+#define FILE_OPEN   O_CREAT | O_EXCL | O_WRONLY | O_APPEND // | O_SYNC
 #define FILE_PERMS  0640
 
 static char* filename(const char *base_path, u_int32_t timestamp) {

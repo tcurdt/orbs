@@ -11,10 +11,9 @@
 #include <time.h>
 #include <assert.h>
 #include <fcntl.h>
-#include <ftw.h>
 #include <stdlib.h>
-#undef _POSIX_C_SOURCE
 #include <unistd.h>
+#include <fts.h>
 
 #define UNUSED(expr) { (void)(expr); }
 

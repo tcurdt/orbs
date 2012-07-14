@@ -13,7 +13,7 @@ LIB_OBJ=$(filter-out src/main/orbs-pipe.o,${OBJECTS})
 TEST_SOURCES=$(wildcard src/test/*.c)
 TESTS=$(patsubst %.c,%,${TEST_SOURCES})
 
-CFLAGS=-g -O2 -Wall -Wextra -Isrc/main -pthread -rdynamic -DNDEBUG $(OPTFLAGS) -D_FILE_OFFSET_BITS=64
+CFLAGS=-g -O2 -Wall -Wextra -Isrc/main -pthread -rdynamic -DNDEBUG $(OPTFLAGS)
 
 all: build tests
 

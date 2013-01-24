@@ -4,7 +4,7 @@ PREFIX?=/usr/local
 INSTALL_BIN=$(PREFIX)/bin
 INSTALL=cp -pf
 
-SOURCES=$(wildcard src/main/*.c src/main/bstr/*.c)
+SOURCES=$(wildcard src/main/*.c) # src/main/bstr/*.c)
 OBJECTS=$(patsubst %.c,%.o,${SOURCES})
 
 LIB_SRC=$(filter-out src/main/orbs-pipe.c,${SOURCES})
@@ -13,7 +13,7 @@ LIB_OBJ=$(filter-out src/main/orbs-pipe.o,${OBJECTS})
 TEST_SOURCES=$(wildcard src/test/*.c)
 TESTS=$(patsubst %.c,%,${TEST_SOURCES})
 
-CFLAGS=-g -O2 -Wall -Wextra -Isrc/main -pthread -rdynamic -DNDEBUG $(OPTFLAGS)
+CFLAGS=-g -O2 -Wall -Wextra -Isrc/main -DNDEBUG $(OPTFLAGS)
 
 all: build tests
 

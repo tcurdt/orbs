@@ -18,7 +18,7 @@ u_int64_t timeval_diff(struct timeval* e, struct timeval* s) {
 
 
 static void usage(char **argv) {
-  fprintf(stderr, "Usage: %s [-t max_total_size] [-s max_segment_size] [-f sync_freq] dir\n", argv[0]);
+  fprintf(stderr, "Usage: cat file | %s [-t max_total_size] [-s max_segment_size] [-f sync_freq(5s|5x)] dir\n", argv[0]);
   exit(-1);
 }
 

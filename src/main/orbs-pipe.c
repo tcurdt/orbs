@@ -18,7 +18,7 @@ u_int64_t timeval_diff(struct timeval* e, struct timeval* s) {
 
 
 static void usage(char **argv) {
-  fprintf(stderr, "Usage: cat file | %s [-t max_total_size] [-s max_segment_size] [-f sync_freq(5s|5x)] dir\n", argv[0]);
+  fprintf(stderr, "Usage: cat file | %s [-t max_total_size(bytes)] [-s max_segment_size(bytes)] [-f sync_freq(5s|5x)] dir\n", argv[0]);
   exit(-1);
 }
 
@@ -142,8 +142,10 @@ int main(int argc, char **argv) {
 
   u_int64_t duration = timeval_diff(&end, &start);
 
-  // printf("%zd messages, %zd bytes in %1.1fs, %1.1f bytes/s\n", total_messages, total_bytes, (double)duration/1000000, (double)total_bytes*1000000/duration);
-  printf("%1.1f\n", (double)total_bytes*1000000/duration);
+  printf("%zd messages\n", total_messages);
+  printf("%zd bytes\n", total_bytes);
+  printf("in %1.1f seconds\n", (double)duration/1000000);
+  printf("= %1f bytes/second\n", (double)total_bytes*1000000/duration);
 
   return 0;
 }
